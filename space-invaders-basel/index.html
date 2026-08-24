@@ -41,7 +41,7 @@
 <body>
 
 <h1>Airbnb Basel — Space Invaders Hunt (open-ended)</h1>
-<p class="subtitle">Space Invaders hunt itinerary &mdash; generated 20260824_161209</p>
+<p class="subtitle">Space Invaders hunt itinerary &mdash; generated 20260824_164329</p>
 <p class="note">Algorithm: Exhaustive search (all combinations) &mdash; this is the guaranteed global optimum, not a heuristic result.</p>
 
 <div class="stat-row">
@@ -133,12 +133,37 @@
   } else {
     map.setView([46.5, 6.6], 10);
   }
+  if (true && navigator.geolocation) {
+    var youMarker = null, youAccuracy = null;
+    navigator.geolocation.watchPosition(function(pos) {
+      var latlng = [pos.coords.latitude, pos.coords.longitude];
+      if (!youMarker) {
+        youMarker = L.circleMarker(latlng, {
+          radius: 8, color: '#ffffff', fillColor: '#4285f4', fillOpacity: 1, weight: 3
+        }).addTo(map);
+        youMarker.bindTooltip('You', {direction: 'top', offset: [0, -8]});
+      } else {
+        youMarker.setLatLng(latlng);
+      }
+      if (pos.coords.accuracy) {
+        if (!youAccuracy) {
+          youAccuracy = L.circle(latlng, {
+            radius: pos.coords.accuracy, color: '#4285f4', weight: 1, fillOpacity: 0.08
+          }).addTo(map);
+        } else {
+          youAccuracy.setLatLng(latlng);
+          youAccuracy.setRadius(pos.coords.accuracy);
+        }
+      }
+    }, function(err) {}, {enableHighAccuracy: true, maximumAge: 5000});
+  }
 })();
 </script>
   <div class="legend">
     <span><span class="dot" style="background:#ffffff;"></span>Start (open)</span>
     <span><span class="dot" style="background:#ffd400;"></span>Space Invader</span>
     <span><span class="dot" style="background:#cfe3ff;border-color:#0057b8;"></span>Parking (used)</span>
+    <span><span class="dot" style="background:#4285f4;border-color:#ffffff;"></span>You (live)</span>
   </div>
   <p class="attribution">Map data &copy; <a href="https://www.openstreetmap.org/copyright" target="_blank" rel="noopener">OpenStreetMap</a> contributors &middot; drag to pan, scroll or use +/&minus; to zoom</p>
 </div>
@@ -170,6 +195,30 @@
     map.fitBounds(L.featureGroup(layers).getBounds(), {padding: [30, 30]});
   } else {
     map.setView([46.5, 6.6], 10);
+  }
+  if (false && navigator.geolocation) {
+    var youMarker = null, youAccuracy = null;
+    navigator.geolocation.watchPosition(function(pos) {
+      var latlng = [pos.coords.latitude, pos.coords.longitude];
+      if (!youMarker) {
+        youMarker = L.circleMarker(latlng, {
+          radius: 8, color: '#ffffff', fillColor: '#4285f4', fillOpacity: 1, weight: 3
+        }).addTo(map);
+        youMarker.bindTooltip('You', {direction: 'top', offset: [0, -8]});
+      } else {
+        youMarker.setLatLng(latlng);
+      }
+      if (pos.coords.accuracy) {
+        if (!youAccuracy) {
+          youAccuracy = L.circle(latlng, {
+            radius: pos.coords.accuracy, color: '#4285f4', weight: 1, fillOpacity: 0.08
+          }).addTo(map);
+        } else {
+          youAccuracy.setLatLng(latlng);
+          youAccuracy.setRadius(pos.coords.accuracy);
+        }
+      }
+    }, function(err) {}, {enableHighAccuracy: true, maximumAge: 5000});
   }
 })();
 </script>
