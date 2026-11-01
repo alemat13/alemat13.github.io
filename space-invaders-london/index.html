@@ -1,0 +1,225 @@
+<!DOCTYPE html>
+<html lang="fr">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Londres — Space Invaders Hunt</title>
+<link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css" />
+<script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js"></script>
+<style>
+  :root { --ink:#1a1a1a; --muted:#5b6570; --line:#e2e6ea; --accent:#e50000; --card:#f8f9fb; --bg:#fff; --link:#0057b8; }
+  @media (prefers-color-scheme: dark) { :root { --ink:#e8eaed; --muted:#9aa4ae; --line:#2f353b; --card:#1c2126; --bg:#121518; --link:#7ab4ff; } }
+  * { box-sizing: border-box; }
+  body { font-family: system-ui, -apple-system, "Segoe UI", sans-serif; max-width: 880px; margin: 0 auto;
+         padding: 40px 16px 80px; color: var(--ink); line-height: 1.55; background: var(--bg); }
+  h1 { font-size: 1.9rem; margin-bottom: 4px; }
+  .subtitle { color: var(--muted); margin-top: 0; margin-bottom: 24px; }
+  h2 { font-size: 1.3rem; border-bottom: 2px solid var(--line); padding-bottom: 8px; margin-top: 48px; }
+  .stat-row { display: flex; flex-wrap: wrap; gap: 12px; margin: 20px 0; }
+  .stat { background: var(--card); border: 1px solid var(--line); border-radius: 10px; padding: 14px 18px; flex: 1 1 150px; }
+  .stat .label { font-size: 0.78rem; color: var(--muted); text-transform: uppercase; letter-spacing: 0.03em; }
+  .stat .value { font-size: 1.4rem; font-weight: 600; margin-top: 2px; font-variant-numeric: tabular-nums; }
+  .callout { background: var(--card); border: 1px solid var(--line); border-radius: 8px; padding: 10px 14px; font-size: 0.92rem; }
+  .leg { background: var(--card); border: 1px solid var(--line); border-left: 5px solid var(--accent); border-radius: 8px; padding: 12px 16px; margin: 12px 0; }
+  .leg.walk { border-left-color: #8a96a3; }
+  .leg h3 { margin: 0 0 4px; font-size: 1.02rem; }
+  .leg .meta { color: var(--muted); font-size: 0.9rem; }
+  .leg ul { margin: 6px 0 0; padding-left: 20px; font-size: 0.93rem; }
+  .table-wrap { overflow-x: auto; }
+  table { width: 100%; border-collapse: collapse; margin: 16px 0; }
+  th, td { text-align: left; padding: 8px 10px; border-bottom: 1px solid var(--line); font-size: 0.92rem; }
+  td.num { text-align: right; font-variant-numeric: tabular-nums; white-space: nowrap; }
+  th { color: var(--muted); font-weight: 600; font-size: 0.8rem; text-transform: uppercase; letter-spacing: 0.02em; }
+  a { color: var(--link); text-decoration: none; } a:hover { text-decoration: underline; }
+  .note { color: var(--muted); font-size: 0.9rem; }
+  #map { height: 460px; border-radius: 10px; border: 1px solid var(--line); margin: 16px 0 6px; }
+  .num-icon { background: #111; color: #fff; border: 2px solid #fff; border-radius: 50%; width: 24px; height: 24px; display: flex;
+              align-items: center; justify-content: center; font-size: 11px; font-weight: 700; box-shadow: 0 1px 3px rgba(0,0,0,.4); }
+  .num-icon.hotel { background: #1a8f3c; }
+  .maps-links { display: flex; flex-wrap: wrap; gap: 8px; }
+  .maps-links a { background: #4f46e5; color: #fff; padding: 8px 14px; border-radius: 8px; font-weight: 600; font-size: 0.9rem; }
+</style>
+</head>
+<body>
+<h1>Londres — Space Invaders Hunt</h1>
+<p class="subtitle">Boucle en transports en commun au départ de l’Ibis London City – Shoreditch · calculée le 01/11/2026 avec <a href="https://alemat13.github.io/tsp_solver_react/">TSP Planner</a> (données Google Maps)</p>
+<p class="note">Ordre prouvé optimal (branch-and-cut exact, HiGHS).</p>
+<div class="stat-row">
+  <div class="stat"><div class="label">Invaders</div><div class="value">60</div></div>
+  <div class="stat"><div class="label">Points</div><div class="value">1640</div></div>
+  <div class="stat"><div class="label">Distance</div><div class="value">32.2 km</div></div>
+  <div class="stat"><div class="label">Déplacements</div><div class="value">6 h 08 min</div></div>
+</div>
+<p class="callout">⚠️ 12 paires d’arrêts n’ont pas de liaison en transports en commun ; le trajet les évite autant que possible.</p>
+<p class="callout">⏰ Horaires calculés pour un départ vers 13 h le 01/11/2026 : ouvrir les liens Google Maps sur place pour les horaires réels. La durée n’inclut pas le temps passé à chercher et flasher.</p>
+<h2>Carte</h2>
+<div id="map"></div>
+<p class="note">Segments en ligne droite entre les arrêts, dans l’ordre du parcours. H = hôtel.</p>
+<h2>Itinéraire dans Google Maps</h2>
+<div class="maps-links">
+<a href="https://www.google.com/maps/dir/?api=1&amp;origin=51.515593%2C-0.072942&amp;destination=51.522209%2C-0.087204&amp;travelmode=transit&amp;waypoints=51.521254%2C-0.071744%7C51.522521%2C-0.071677%7C51.521623%2C-0.071818%7C51.521542%2C-0.075501%7C51.526294%2C-0.078968%7C51.526216%2C-0.080365%7C51.526860%2C-0.080542%7C51.527837%2C-0.076580%7C51.527317%2C-0.081757" target="_blank" rel="noopener">Maps 1/7</a>
+<a href="https://www.google.com/maps/dir/?api=1&amp;origin=51.522209%2C-0.087204&amp;destination=51.521943%2C-0.157248&amp;travelmode=transit&amp;waypoints=51.522122%2C-0.106786%7C51.519382%2C-0.117029%7C51.517527%2C-0.116016%7C51.522966%2C-0.124743%7C51.522345%2C-0.132336%7C51.520918%2C-0.134849%7C51.519326%2C-0.133084%7C51.519270%2C-0.136004%7C51.517015%2C-0.151388" target="_blank" rel="noopener">Maps 2/7</a>
+<a href="https://www.google.com/maps/dir/?api=1&amp;origin=51.521943%2C-0.157248&amp;destination=51.509992%2C-0.140039&amp;travelmode=transit&amp;waypoints=51.523892%2C-0.158497%7C51.514851%2C-0.151226%7C51.515460%2C-0.139255%7C51.515813%2C-0.136210%7C51.514961%2C-0.136472%7C51.514338%2C-0.136786%7C51.512983%2C-0.136218%7C51.512601%2C-0.136955%7C51.512536%2C-0.137241" target="_blank" rel="noopener">Maps 3/7</a>
+<a href="https://www.google.com/maps/dir/?api=1&amp;origin=51.509992%2C-0.140039&amp;destination=51.513460%2C-0.134891&amp;travelmode=transit&amp;waypoints=51.506414%2C-0.146227%7C51.509690%2C-0.136017%7C51.511956%2C-0.135037%7C51.512020%2C-0.135178%7C51.511343%2C-0.134347%7C51.511957%2C-0.131382%7C51.514566%2C-0.131128%7C51.513368%2C-0.132773%7C51.512969%2C-0.133761" target="_blank" rel="noopener">Maps 4/7</a>
+<a href="https://www.google.com/maps/dir/?api=1&amp;origin=51.513460%2C-0.134891&amp;destination=51.493388%2C-0.116923&amp;travelmode=transit&amp;waypoints=51.514322%2C-0.134207%7C51.515811%2C-0.136195%7C51.516699%2C-0.132486%7C51.517075%2C-0.127163%7C51.514164%2C-0.124388%7C51.512881%2C-0.127115%7C51.510537%2C-0.123692%7C51.510298%2C-0.125734%7C51.507127%2C-0.128264" target="_blank" rel="noopener">Maps 5/7</a>
+<a href="https://www.google.com/maps/dir/?api=1&amp;origin=51.493388%2C-0.116923&amp;destination=51.516355%2C-0.074959&amp;travelmode=transit&amp;waypoints=51.493646%2C-0.116993%7C51.493632%2C-0.117003%7C51.500508%2C-0.115014%7C51.502199%2C-0.116228%7C51.506113%2C-0.114483%7C51.507246%2C-0.096041%7C51.505253%2C-0.092062%7C51.518037%2C-0.079639%7C51.518145%2C-0.079539" target="_blank" rel="noopener">Maps 6/7</a>
+<a href="https://www.google.com/maps/dir/?api=1&amp;origin=51.516355%2C-0.074959&amp;destination=51.515593%2C-0.072942&amp;travelmode=transit" target="_blank" rel="noopener">Maps 7/7</a>
+</div>
+<h2>Par mode de transport</h2><div class="table-wrap"><table><thead><tr><th>Mode</th><th>Distance</th><th>Temps</th><th>Détail</th></tr></thead><tbody>
+<tr><td>🚶 Marche</td><td class="num">20.3 km</td><td class="num">4 h 49</td><td>sur la plupart des étapes</td></tr>
+<tr><td>🚌 Bus</td><td class="num">11.4 km</td><td class="num">1 h 26</td><td>12 trajets · lignes 1, 13, 23, 55, 139, 159, 242, 243, 344, 381, 390</td></tr>
+<tr><td>🚇 Métro</td><td class="num">0.6 km</td><td class="num">1 min</td><td>1 trajet · ligne Central</td></tr>
+<tr><td>⏳ Attente</td><td class="num">—</td><td class="num">≈ 8 min</td><td>aux arrêts (sans doute sous-estimée)</td></tr>
+</tbody></table></div><p class="note">Distances en bus et métro estimées (distance de l’étape moins la marche) ; le total détaillé peut différer légèrement du résumé.</p>
+<h2>Vue d’ensemble</h2><div class="table-wrap"><table><thead><tr><th>#</th><th>Arrêt</th><th>Pts</th><th>État</th><th>Vers le suivant</th></tr></thead><tbody>
+<tr><td>1</td><td><a href="https://www.google.com/maps/search/?api=1&amp;query=51.5155931,-0.0729418" target="_blank" rel="noopener"><strong>Ibis Shoreditch</strong></a></td><td class="num"></td><td></td><td>842 m · 12 min · à pied</td></tr>
+<tr><td>2</td><td><a href="https://www.google.com/maps/search/?api=1&amp;query=51.5212535,-0.071744" target="_blank" rel="noopener">LDN_25</a></td><td class="num">20</td><td>OK</td><td>184 m · 3 min · à pied</td></tr>
+<tr><td>3</td><td><a href="https://www.google.com/maps/search/?api=1&amp;query=51.5225212,-0.0716766" target="_blank" rel="noopener">LDN_57</a></td><td class="num">10</td><td>OK</td><td>100 m · 1 min · à pied</td></tr>
+<tr><td>4</td><td><a href="https://www.google.com/maps/search/?api=1&amp;query=51.521623,-0.0718179" target="_blank" rel="noopener">LDN_24</a></td><td class="num">10</td><td>OK</td><td>368 m · 5 min · à pied</td></tr>
+<tr><td>5</td><td><a href="https://www.google.com/maps/search/?api=1&amp;query=51.5215422,-0.0755008" target="_blank" rel="noopener">LDN_171</a></td><td class="num">40</td><td>OK</td><td>677 m · 10 min · 13h15 – 13h18</td></tr>
+<tr><td>6</td><td><a href="https://www.google.com/maps/search/?api=1&amp;query=51.5262941,-0.0789677" target="_blank" rel="noopener">LDN_97</a></td><td class="num">30</td><td>OK</td><td>94 m · 1 min · à pied</td></tr>
+<tr><td>7</td><td><a href="https://www.google.com/maps/search/?api=1&amp;query=51.5262157,-0.0803647" target="_blank" rel="noopener">LDN_102</a></td><td class="num">10</td><td>OK</td><td>101 m · 1 min · à pied</td></tr>
+<tr><td>8</td><td><a href="https://www.google.com/maps/search/?api=1&amp;query=51.5268595,-0.0805417" target="_blank" rel="noopener">LDN_170</a></td><td class="num">30</td><td>OK</td><td>347 m · 3 min · 13h21 – 13h22</td></tr>
+<tr><td>9</td><td><a href="https://www.google.com/maps/search/?api=1&amp;query=51.527837,-0.0765804" target="_blank" rel="noopener">LDN_172</a></td><td class="num">40</td><td>OK</td><td>411 m · 6 min · à pied</td></tr>
+<tr><td>10</td><td><a href="https://www.google.com/maps/search/?api=1&amp;query=51.527317,-0.081757" target="_blank" rel="noopener">LDN_121</a></td><td class="num">30</td><td>OK</td><td>867 m · 13 min · à pied</td></tr>
+<tr><td>11</td><td><a href="https://www.google.com/maps/search/?api=1&amp;query=51.5222087,-0.087204" target="_blank" rel="noopener">LDN_169</a></td><td class="num">20</td><td>OK</td><td>1.8 km · 15 min · 13h22 – 13h27</td></tr>
+<tr><td>12</td><td><a href="https://www.google.com/maps/search/?api=1&amp;query=51.522122,-0.106786" target="_blank" rel="noopener">LDN_79</a></td><td class="num">10</td><td>OK</td><td>1.2 km · 9 min · 13h20 – 13h25</td></tr>
+<tr><td>13</td><td><a href="https://www.google.com/maps/search/?api=1&amp;query=51.5193824,-0.1170291" target="_blank" rel="noopener">LDN_175</a></td><td class="num">50</td><td>OK</td><td>293 m · 4 min · à pied</td></tr>
+<tr><td>14</td><td><a href="https://www.google.com/maps/search/?api=1&amp;query=51.5175272,-0.1160163" target="_blank" rel="noopener">LDN_160</a></td><td class="num">30</td><td>OK</td><td>1.4 km · 15 min · 13h24 – 13h29</td></tr>
+<tr><td>15</td><td><a href="https://www.google.com/maps/search/?api=1&amp;query=51.5229664,-0.1247428" target="_blank" rel="noopener">LDN_176</a></td><td class="num">20</td><td>OK</td><td>753 m · 11 min · à pied</td></tr>
+<tr><td>16</td><td><a href="https://www.google.com/maps/search/?api=1&amp;query=51.522345,-0.132336" target="_blank" rel="noopener">LDN_54</a></td><td class="num">30</td><td>OK</td><td>294 m · 4 min · à pied</td></tr>
+<tr><td>17</td><td><a href="https://www.google.com/maps/search/?api=1&amp;query=51.5209184,-0.1348491" target="_blank" rel="noopener">LDN_178</a></td><td class="num">50</td><td>OK</td><td>213 m · 3 min · à pied</td></tr>
+<tr><td>18</td><td><a href="https://www.google.com/maps/search/?api=1&amp;query=51.5193260416,-0.1330843321" target="_blank" rel="noopener">LDN_165</a></td><td class="num">20</td><td>OK</td><td>279 m · 4 min · à pied</td></tr>
+<tr><td>19</td><td><a href="https://www.google.com/maps/search/?api=1&amp;query=51.5192705,-0.1360037" target="_blank" rel="noopener">LDN_153</a></td><td class="num">30</td><td>OK</td><td>1.2 km · 17 min · 13h24 – 13h37</td></tr>
+<tr><td>20</td><td><a href="https://www.google.com/maps/search/?api=1&amp;query=51.517015,-0.151388" target="_blank" rel="noopener">LDN_20</a></td><td class="num">10</td><td>OK</td><td>954 m · 10 min · 13h18 – 13h23</td></tr>
+<tr><td>21</td><td><a href="https://www.google.com/maps/search/?api=1&amp;query=51.5219432,-0.1572482" target="_blank" rel="noopener">LDN_174</a></td><td class="num">20</td><td>OK</td><td>269 m · 4 min · à pied</td></tr>
+<tr><td>22</td><td><a href="https://www.google.com/maps/search/?api=1&amp;query=51.5238924,-0.1584974" target="_blank" rel="noopener">LDN_173</a></td><td class="num">30</td><td>OK</td><td>1.3 km · 8 min · 13h18 – 13h25</td></tr>
+<tr><td>23</td><td><a href="https://www.google.com/maps/search/?api=1&amp;query=51.514851,-0.151226" target="_blank" rel="noopener">LDN_19</a></td><td class="num">10</td><td>OK</td><td>1.1 km · 10 min · 13h19 – 13h20</td></tr>
+<tr><td>24</td><td><a href="https://www.google.com/maps/search/?api=1&amp;query=51.51546,-0.139255" target="_blank" rel="noopener">LDN_29</a></td><td class="num">10</td><td>OK</td><td>224 m · 3 min · à pied</td></tr>
+<tr><td>25</td><td><a href="https://www.google.com/maps/search/?api=1&amp;query=51.515813,-0.1362096" target="_blank" rel="noopener">LDN_193</a></td><td class="num">20</td><td>OK</td><td>150 m · 2 min · à pied</td></tr>
+<tr><td>26</td><td><a href="https://www.google.com/maps/search/?api=1&amp;query=51.5149615,-0.1364717" target="_blank" rel="noopener">LDN_92</a></td><td class="num">30</td><td>OK</td><td>115 m · 2 min · à pied</td></tr>
+<tr><td>27</td><td><a href="https://www.google.com/maps/search/?api=1&amp;query=51.5143377,-0.1367863" target="_blank" rel="noopener">LDN_191</a></td><td class="num">20</td><td>OK</td><td>176 m · 2 min · à pied</td></tr>
+<tr><td>28</td><td><a href="https://www.google.com/maps/search/?api=1&amp;query=51.5129826,-0.1362178" target="_blank" rel="noopener">LDN_159</a></td><td class="num">50</td><td>OK</td><td>64 m · 1 min · à pied</td></tr>
+<tr><td>29</td><td><a href="https://www.google.com/maps/search/?api=1&amp;query=51.5126008,-0.1369547" target="_blank" rel="noopener">LDN_151</a></td><td class="num">30</td><td>OK</td><td>18 m · 1 min · à pied</td></tr>
+<tr><td>30</td><td><a href="https://www.google.com/maps/search/?api=1&amp;query=51.5125358,-0.1372414" target="_blank" rel="noopener">LDN_152</a></td><td class="num">30</td><td>OK</td><td>469 m · 7 min · à pied</td></tr>
+<tr><td>31</td><td><a href="https://www.google.com/maps/search/?api=1&amp;query=51.509992,-0.140039" target="_blank" rel="noopener">LDN_13</a></td><td class="num">20</td><td>OK</td><td>825 m · 11 min · à pied</td></tr>
+<tr><td>32</td><td><a href="https://www.google.com/maps/search/?api=1&amp;query=51.506414,-0.1462273" target="_blank" rel="noopener">LDN_184</a></td><td class="num">20</td><td>OK</td><td>956 m · 9 min · 13h20 – 13h22</td></tr>
+<tr><td>33</td><td><a href="https://www.google.com/maps/search/?api=1&amp;query=51.50969,-0.136017" target="_blank" rel="noopener">LDN_15</a></td><td class="num">20</td><td>OK</td><td>325 m · 5 min · à pied</td></tr>
+<tr><td>34</td><td><a href="https://www.google.com/maps/search/?api=1&amp;query=51.5119560272,-0.1350373469" target="_blank" rel="noopener">LDN_163</a></td><td class="num">50</td><td>OK</td><td>11 m · 1 min · à pied</td></tr>
+<tr><td>35</td><td><a href="https://www.google.com/maps/search/?api=1&amp;query=51.5120201,-0.1351777" target="_blank" rel="noopener">LDN_162</a></td><td class="num">30</td><td>OK</td><td>102 m · 1 min · à pied</td></tr>
+<tr><td>36</td><td><a href="https://www.google.com/maps/search/?api=1&amp;query=51.5113429,-0.1343472" target="_blank" rel="noopener">LDN_180</a></td><td class="num">20</td><td>OK</td><td>317 m · 5 min · à pied</td></tr>
+<tr><td>37</td><td><a href="https://www.google.com/maps/search/?api=1&amp;query=51.5119574,-0.131382" target="_blank" rel="noopener">LDN_190</a></td><td class="num">20</td><td>OK</td><td>363 m · 5 min · à pied</td></tr>
+<tr><td>38</td><td><a href="https://www.google.com/maps/search/?api=1&amp;query=51.514566,-0.131128" target="_blank" rel="noopener">LDN_64</a></td><td class="num">10</td><td>OK</td><td>223 m · 3 min · à pied</td></tr>
+<tr><td>39</td><td><a href="https://www.google.com/maps/search/?api=1&amp;query=51.513368,-0.132773" target="_blank" rel="noopener">LDN_06</a></td><td class="num">10</td><td>OK</td><td>74 m · 1 min · à pied</td></tr>
+<tr><td>40</td><td><a href="https://www.google.com/maps/search/?api=1&amp;query=51.5129690281,-0.1337609785" target="_blank" rel="noopener">LDN_166</a></td><td class="num">20</td><td>OK</td><td>124 m · 2 min · à pied</td></tr>
+<tr><td>41</td><td><a href="https://www.google.com/maps/search/?api=1&amp;query=51.5134601,-0.134891" target="_blank" rel="noopener">LDN_189</a></td><td class="num">40</td><td>OK</td><td>149 m · 2 min · à pied</td></tr>
+<tr><td>42</td><td><a href="https://www.google.com/maps/search/?api=1&amp;query=51.5143224,-0.1342068" target="_blank" rel="noopener">LDN_55</a></td><td class="num">30</td><td>OK</td><td>259 m · 4 min · à pied</td></tr>
+<tr><td>43</td><td><a href="https://www.google.com/maps/search/?api=1&amp;query=51.5158112,-0.1361955" target="_blank" rel="noopener">LDN_192</a></td><td class="num">20</td><td>OK</td><td>299 m · 4 min · à pied</td></tr>
+<tr><td>44</td><td><a href="https://www.google.com/maps/search/?api=1&amp;query=51.5166993,-0.1324863" target="_blank" rel="noopener">LDN_73</a></td><td class="num">30</td><td>OK</td><td>449 m · 6 min · à pied</td></tr>
+<tr><td>45</td><td><a href="https://www.google.com/maps/search/?api=1&amp;query=51.5170755,-0.1271632" target="_blank" rel="noopener">LDN_179</a></td><td class="num">40</td><td>Un peu dégradé</td><td>440 m · 6 min · à pied</td></tr>
+<tr><td>46</td><td><a href="https://www.google.com/maps/search/?api=1&amp;query=51.514164,-0.124388" target="_blank" rel="noopener">LDN_38</a></td><td class="num">10</td><td>OK</td><td>277 m · 4 min · à pied</td></tr>
+<tr><td>47</td><td><a href="https://www.google.com/maps/search/?api=1&amp;query=51.5128805,-0.127115" target="_blank" rel="noopener">LDN_161</a></td><td class="num">20</td><td>OK</td><td>432 m · 6 min · à pied</td></tr>
+<tr><td>48</td><td><a href="https://www.google.com/maps/search/?api=1&amp;query=51.5105366,-0.1236921" target="_blank" rel="noopener">LDN_187</a></td><td class="num">30</td><td>OK</td><td>201 m · 3 min · à pied</td></tr>
+<tr><td>49</td><td><a href="https://www.google.com/maps/search/?api=1&amp;query=51.5102983,-0.1257336" target="_blank" rel="noopener">LDN_186</a></td><td class="num">30</td><td>OK</td><td>523 m · 8 min · à pied</td></tr>
+<tr><td>50</td><td><a href="https://www.google.com/maps/search/?api=1&amp;query=51.5071271,-0.1282639" target="_blank" rel="noopener">LDN_185</a></td><td class="num">30</td><td>OK</td><td>3.0 km · 25 min · 13h16 – 13h28</td></tr>
+<tr><td>51</td><td><a href="https://www.google.com/maps/search/?api=1&amp;query=51.4933875046,-0.116923429" target="_blank" rel="noopener">LDN_164</a></td><td class="num">30</td><td>OK</td><td>21 m · 1 min · à pied</td></tr>
+<tr><td>52</td><td><a href="https://www.google.com/maps/search/?api=1&amp;query=51.493646,-0.116993" target="_blank" rel="noopener">LDN_158</a></td><td class="num">20</td><td>OK</td><td>2 m · 1 min · à pied</td></tr>
+<tr><td>53</td><td><a href="https://www.google.com/maps/search/?api=1&amp;query=51.493632,-0.117003" target="_blank" rel="noopener">LDN_157</a></td><td class="num">20</td><td>OK</td><td>1.0 km · 14 min · à pied</td></tr>
+<tr><td>54</td><td><a href="https://www.google.com/maps/search/?api=1&amp;query=51.5005078,-0.1150141" target="_blank" rel="noopener">LDN_182</a></td><td class="num">30</td><td>OK</td><td>316 m · 4 min · à pied</td></tr>
+<tr><td>55</td><td><a href="https://www.google.com/maps/search/?api=1&amp;query=51.5021986,-0.1162278" target="_blank" rel="noopener">LDN_183</a></td><td class="num">50</td><td>OK</td><td>583 m · 8 min · à pied</td></tr>
+<tr><td>56</td><td><a href="https://www.google.com/maps/search/?api=1&amp;query=51.5061131,-0.1144831" target="_blank" rel="noopener">LDN_188</a></td><td class="num">100</td><td>OK</td><td>1.7 km · 15 min · 13h25 – 13h31</td></tr>
+<tr><td>57</td><td><a href="https://www.google.com/maps/search/?api=1&amp;query=51.507246,-0.096041" target="_blank" rel="noopener">LDN_82</a></td><td class="num">20</td><td>OK</td><td>417 m · 6 min · à pied</td></tr>
+<tr><td>58</td><td><a href="https://www.google.com/maps/search/?api=1&amp;query=51.505253,-0.092062" target="_blank" rel="noopener">LDN_83</a></td><td class="num">30</td><td>OK</td><td>1.8 km · 13 min · 13h18 – 13h29</td></tr>
+<tr><td>59</td><td><a href="https://www.google.com/maps/search/?api=1&amp;query=51.5180373,-0.0796388" target="_blank" rel="noopener">LDN_168</a></td><td class="num">30</td><td>OK</td><td>29 m · 1 min · à pied</td></tr>
+<tr><td>60</td><td><a href="https://www.google.com/maps/search/?api=1&amp;query=51.518145,-0.079539" target="_blank" rel="noopener">LDN_99</a></td><td class="num">30</td><td>OK</td><td>453 m · 6 min · à pied</td></tr>
+<tr><td>61</td><td><a href="https://www.google.com/maps/search/?api=1&amp;query=51.5163549,-0.0749594" target="_blank" rel="noopener">LDN_167</a></td><td class="num">40</td><td>OK</td><td>298 m · 4 min · à pied</td></tr>
+<tr><td>Retour</td><td><a href="https://www.google.com/maps/search/?api=1&amp;query=51.5155931,-0.0729418" target="_blank" rel="noopener"><strong>Ibis Shoreditch</strong></a></td><td class="num"></td><td></td><td></td></tr>
+</tbody></table></div>
+<h2>Étape par étape</h2>
+<div class="leg walk"><h3>1. Ibis Shoreditch → LDN_25</h3><div class="meta">842 m · 12 min · à pied</div><ul><li>🚶 Marche 12 min · 844 m</li></ul></div>
+<div class="leg walk"><h3>2. LDN_25 → LDN_57</h3><div class="meta">184 m · 3 min · à pied</div><ul><li>🚶 Marche 3 min · 184 m</li></ul></div>
+<div class="leg walk"><h3>3. LDN_57 → LDN_24</h3><div class="meta">100 m · 1 min · à pied</div><ul><li>🚶 Marche 1 min · 100 m</li></ul></div>
+<div class="leg walk"><h3>4. LDN_24 → LDN_171</h3><div class="meta">368 m · 5 min · à pied</div><ul><li>🚶 Marche 5 min · 369 m</li></ul></div>
+<div class="leg"><h3>5. LDN_171 → LDN_97</h3><div class="meta">677 m · 10 min · 13h15 – 13h18</div><ul><li>🚶 Marche 1 min · 81 m</li><li>🚌 <strong>Bus 242</strong> direction Homerton — monter à 13h15 Shoreditch High Street Station (Stop S), descendre à 13h18 Shoreditch Church (Stop P) (Bus · 3 arrêts · 4 min)</li><li>🚶 Marche 1 min · 92 m</li></ul></div>
+<div class="leg walk"><h3>6. LDN_97 → LDN_102</h3><div class="meta">94 m · 1 min · à pied</div><ul><li>🚶 Marche 1 min · 94 m</li></ul></div>
+<div class="leg walk"><h3>7. LDN_102 → LDN_170</h3><div class="meta">101 m · 1 min · à pied</div><ul><li>🚶 Marche 1 min · 102 m</li></ul></div>
+<div class="leg"><h3>8. LDN_170 → LDN_172</h3><div class="meta">347 m · 3 min · 13h21 – 13h22</div><ul><li>🚶 Marche 1 min · 91 m</li><li>🚌 <strong>Bus 55</strong> direction Walthamstow — monter à 13h21 Shoreditch Town Hall (Stop X), descendre à 13h22 Hackney Road / Columbia Road (Stop R) (Bus · 1 arrêt · 2 min)</li></ul></div>
+<div class="leg walk"><h3>9. LDN_172 → LDN_121</h3><div class="meta">411 m · 6 min · à pied</div><ul><li>🚶 Marche 6 min · 412 m</li></ul></div>
+<div class="leg walk"><h3>10. LDN_121 → LDN_169</h3><div class="meta">867 m · 13 min · à pied</div><ul><li>🚶 Marche 13 min · 868 m</li></ul></div>
+<div class="leg"><h3>11. LDN_169 → LDN_79</h3><div class="meta">1.8 km · 15 min · 13h22 – 13h27</div><ul><li>🚶 Marche 7 min · 528 m</li><li>🚌 <strong>Bus 243</strong> direction Waterloo — monter à 13h22 Bunhill Row (Stop G), descendre à 13h27 Clerkenwell Green (Stop K) (Bus · 4 arrêts · 5 min)</li><li>🚶 Marche 1 min · 82 m</li></ul></div>
+<div class="leg"><h3>12. LDN_79 → LDN_175</h3><div class="meta">1.2 km · 9 min · 13h20 – 13h25</div><ul><li>🚶 Marche 1 min · 82 m</li><li>🚌 <strong>Bus 243</strong> direction Waterloo — monter à 13h20 Clerkenwell Green (Stop K), descendre à 13h25 Red Lion Street (Stop A) (Bus · 4 arrêts · 5 min)</li><li>🚶 Marche 3 min · 183 m</li></ul></div>
+<div class="leg walk"><h3>13. LDN_175 → LDN_160</h3><div class="meta">293 m · 4 min · à pied</div><ul><li>🚶 Marche 4 min · 293 m</li></ul></div>
+<div class="leg"><h3>14. LDN_160 → LDN_176</h3><div class="meta">1.4 km · 15 min · 13h24 – 13h29</div><ul><li>🚶 Marche 5 min · 371 m</li><li>🚌 <strong>Bus 1</strong> direction Hampstead — monter à 13h24 Holborn Station (Stop N), descendre à 13h29 Russell Square Station (Stop H) (Bus · 2 arrêts · 8 min)</li><li>🚶 Marche 2 min · 148 m</li></ul></div>
+<div class="leg walk"><h3>15. LDN_176 → LDN_54</h3><div class="meta">753 m · 11 min · à pied</div><ul><li>🚶 Marche 11 min · 753 m</li></ul></div>
+<div class="leg walk"><h3>16. LDN_54 → LDN_178</h3><div class="meta">294 m · 4 min · à pied</div><ul><li>🚶 Marche 4 min · 296 m</li></ul></div>
+<div class="leg walk"><h3>17. LDN_178 → LDN_165</h3><div class="meta">213 m · 3 min · à pied</div><ul><li>🚶 Marche 3 min · 213 m</li></ul></div>
+<div class="leg walk"><h3>18. LDN_165 → LDN_153</h3><div class="meta">279 m · 4 min · à pied</div><ul><li>🚶 Marche 4 min · 279 m</li></ul></div>
+<div class="leg"><h3>19. LDN_153 → LDN_20</h3><div class="meta">1.2 km · 17 min · 13h24 – 13h37</div><ul><li>🚶 Marche 4 min · 249 m</li><li>🚌 <strong>Bus 390</strong> direction Victoria — monter à 13h24 Goodge Street Station (Stop D), descendre à 13h37 Wigmore Street / Duke Street (Stop WB) (Bus · 2 arrêts · 15 min)</li><li>🚶 Marche 2 min · 157 m</li></ul></div>
+<div class="leg"><h3>20. LDN_20 → LDN_174</h3><div class="meta">954 m · 10 min · 13h18 – 13h23</div><ul><li>🚶 Marche 2 min · 157 m</li><li>🚌 <strong>Bus 139</strong> direction Golders Green — monter à 13h18 Wigmore Street / Duke Street (Stop WB), descendre à 13h23 York Street (Stop F) (Bus · 2 arrêts · 4 min)</li><li>🚶 Marche 2 min · 143 m</li></ul></div>
+<div class="leg walk"><h3>21. LDN_174 → LDN_173</h3><div class="meta">269 m · 4 min · à pied</div><ul><li>🚶 Marche 4 min · 269 m</li></ul></div>
+<div class="leg"><h3>22. LDN_173 → LDN_19</h3><div class="meta">1.3 km · 8 min · 13h18 – 13h25</div><ul><li>🚶 Marche 1 min · 72 m</li><li>🚌 <strong>Bus 13</strong> direction London Victoria — monter à 13h18 Baker Street Station (Stop A), descendre à 13h25 Orchard Street / Selfridges (Stop BZ) (Bus · 3 arrêts · 7 min)</li><li>🚶 Marche 4 min · 330 m</li></ul></div>
+<div class="leg"><h3>23. LDN_19 → LDN_29</h3><div class="meta">1.1 km · 10 min · 13h19 – 13h20</div><ul><li>🚶 Marche 5 min · 277 m</li><li>🚇 <strong>Métro Central</strong> direction Loughton — monter à 13h19 Bond Street, descendre à 13h20 Oxford Circus (Métro · 1 arrêt · 1 min)</li><li>🚶 Marche 4 min · 247 m</li></ul></div>
+<div class="leg walk"><h3>24. LDN_29 → LDN_193</h3><div class="meta">224 m · 3 min · à pied</div><ul><li>🚶 Marche 3 min · 224 m</li></ul></div>
+<div class="leg walk"><h3>25. LDN_193 → LDN_92</h3><div class="meta">150 m · 2 min · à pied</div><ul><li>🚶 Marche 2 min · 150 m</li></ul></div>
+<div class="leg walk"><h3>26. LDN_92 → LDN_191</h3><div class="meta">115 m · 2 min · à pied</div><ul><li>🚶 Marche 2 min · 116 m</li></ul></div>
+<div class="leg walk"><h3>27. LDN_191 → LDN_159</h3><div class="meta">176 m · 2 min · à pied</div><ul><li>🚶 Marche 2 min · 177 m</li></ul></div>
+<div class="leg walk"><h3>28. LDN_159 → LDN_151</h3><div class="meta">64 m · 1 min · à pied</div><ul><li>🚶 Marche 1 min · 65 m</li></ul></div>
+<div class="leg walk"><h3>29. LDN_151 → LDN_152</h3><div class="meta">18 m · 1 min · à pied</div><ul><li>🚶 Marche 1 min · 19 m</li></ul></div>
+<div class="leg walk"><h3>30. LDN_152 → LDN_13</h3><div class="meta">469 m · 7 min · à pied</div><ul><li>🚶 Marche 7 min · 468 m</li></ul></div>
+<div class="leg walk"><h3>31. LDN_13 → LDN_184</h3><div class="meta">825 m · 11 min · à pied</div><ul><li>🚶 Marche 11 min · 827 m</li></ul></div>
+<div class="leg"><h3>32. LDN_184 → LDN_15</h3><div class="meta">956 m · 9 min · 13h20 – 13h22</div><ul><li>🚶 Marche 6 min · 384 m</li><li>🚌 <strong>Bus 23</strong> direction Temple — monter à 13h20 Green Park, descendre à 13h22 Piccadilly Circus (Stop B) (Bus · 2 arrêts · 4 min)</li><li>🚶 Marche 1 min · 66 m</li></ul></div>
+<div class="leg walk"><h3>33. LDN_15 → LDN_163</h3><div class="meta">325 m · 5 min · à pied</div><ul><li>🚶 Marche 5 min · 326 m</li></ul></div>
+<div class="leg walk"><h3>34. LDN_163 → LDN_162</h3><div class="meta">11 m · 1 min · à pied</div><ul><li>🚶 Marche 1 min · 12 m</li></ul></div>
+<div class="leg walk"><h3>35. LDN_162 → LDN_180</h3><div class="meta">102 m · 1 min · à pied</div><ul><li>🚶 Marche 1 min · 103 m</li></ul></div>
+<div class="leg walk"><h3>36. LDN_180 → LDN_190</h3><div class="meta">317 m · 5 min · à pied</div><ul><li>🚶 Marche 5 min · 318 m</li></ul></div>
+<div class="leg walk"><h3>37. LDN_190 → LDN_64</h3><div class="meta">363 m · 5 min · à pied</div><ul><li>🚶 Marche 5 min · 364 m</li></ul></div>
+<div class="leg walk"><h3>38. LDN_64 → LDN_06</h3><div class="meta">223 m · 3 min · à pied</div><ul><li>🚶 Marche 3 min · 223 m</li></ul></div>
+<div class="leg walk"><h3>39. LDN_06 → LDN_166</h3><div class="meta">74 m · 1 min · à pied</div><ul><li>🚶 Marche 1 min · 75 m</li></ul></div>
+<div class="leg walk"><h3>40. LDN_166 → LDN_189</h3><div class="meta">124 m · 2 min · à pied</div><ul><li>🚶 Marche 2 min · 125 m</li></ul></div>
+<div class="leg walk"><h3>41. LDN_189 → LDN_55</h3><div class="meta">149 m · 2 min · à pied</div><ul><li>🚶 Marche 2 min · 150 m</li></ul></div>
+<div class="leg walk"><h3>42. LDN_55 → LDN_192</h3><div class="meta">259 m · 4 min · à pied</div><ul><li>🚶 Marche 4 min · 260 m</li></ul></div>
+<div class="leg walk"><h3>43. LDN_192 → LDN_73</h3><div class="meta">299 m · 4 min · à pied</div><ul><li>🚶 Marche 4 min · 299 m</li></ul></div>
+<div class="leg walk"><h3>44. LDN_73 → LDN_179</h3><div class="meta">449 m · 6 min · à pied</div><ul><li>🚶 Marche 6 min · 449 m</li></ul></div>
+<div class="leg walk"><h3>45. LDN_179 → LDN_38</h3><div class="meta">440 m · 6 min · à pied</div><ul><li>🚶 Marche 6 min · 440 m</li></ul></div>
+<div class="leg walk"><h3>46. LDN_38 → LDN_161</h3><div class="meta">277 m · 4 min · à pied</div><ul><li>🚶 Marche 4 min · 278 m</li></ul></div>
+<div class="leg walk"><h3>47. LDN_161 → LDN_187</h3><div class="meta">432 m · 6 min · à pied</div><ul><li>🚶 Marche 6 min · 433 m</li></ul></div>
+<div class="leg walk"><h3>48. LDN_187 → LDN_186</h3><div class="meta">201 m · 3 min · à pied</div><ul><li>🚶 Marche 3 min · 202 m</li></ul></div>
+<div class="leg walk"><h3>49. LDN_186 → LDN_185</h3><div class="meta">523 m · 8 min · à pied</div><ul><li>🚶 Marche 8 min · 524 m</li></ul></div>
+<div class="leg"><h3>50. LDN_185 → LDN_164</h3><div class="meta">3.0 km · 25 min · 13h16 – 13h28</div><ul><li>🚶 Marche 2 min · 142 m</li><li>🚌 <strong>Bus 159</strong> direction Streatham — monter à 13h16 Whitehall / Trafalgar Square (Stop M), descendre à 13h28 Kennington Road / Imperial War Museum (Stop S) (Bus · 7 arrêts · 14 min)</li><li>🚶 Marche 9 min · 637 m</li></ul></div>
+<div class="leg walk"><h3>51. LDN_164 → LDN_158</h3><div class="meta">21 m · 1 min · à pied</div><ul><li>🚶 Marche 1 min · 21 m</li></ul></div>
+<div class="leg walk"><h3>52. LDN_158 → LDN_157</h3><div class="meta">2 m · 1 min · à pied</div><ul><li>🚶 Marche 1 min · 2 m</li></ul></div>
+<div class="leg walk"><h3>53. LDN_157 → LDN_182</h3><div class="meta">1.0 km · 14 min · à pied</div><ul><li>🚶 Marche 14 min · 1.0 km</li></ul></div>
+<div class="leg walk"><h3>54. LDN_182 → LDN_183</h3><div class="meta">316 m · 4 min · à pied</div><ul><li>🚶 Marche 4 min · 317 m</li></ul></div>
+<div class="leg walk"><h3>55. LDN_183 → LDN_188</h3><div class="meta">583 m · 8 min · à pied</div><ul><li>🚶 Marche 8 min · 584 m</li></ul></div>
+<div class="leg"><h3>56. LDN_188 → LDN_82</h3><div class="meta">1.7 km · 15 min · 13h25 – 13h31</div><ul><li>🚶 Marche 3 min · 259 m</li><li>🚌 <strong>Bus 381</strong> direction Peckham — monter à 13h25 Waterloo Road (Stop M), descendre à 13h31 Lavington (Stop SW) (Bus · 4 arrêts · 6 min)</li><li>🚶 Marche 6 min · 403 m</li></ul></div>
+<div class="leg walk"><h3>57. LDN_82 → LDN_83</h3><div class="meta">417 m · 6 min · à pied</div><ul><li>🚶 Marche 6 min · 417 m</li></ul></div>
+<div class="leg"><h3>58. LDN_83 → LDN_168</h3><div class="meta">1.8 km · 13 min · 13h18 – 13h29</div><ul><li>🚶 Marche 3 min · 224 m</li><li>🚌 <strong>Bus 344</strong> direction Liverpool Street — monter à 13h18 The Hop Exchange, descendre à 13h29 Liverpool Street Station (Stop E) (Bus · 7 arrêts · 12 min)</li><li>🚶 Marche 1 min · 53 m</li></ul></div>
+<div class="leg walk"><h3>59. LDN_168 → LDN_99</h3><div class="meta">29 m · 1 min · à pied</div><ul><li>🚶 Marche 1 min · 30 m</li></ul></div>
+<div class="leg walk"><h3>60. LDN_99 → LDN_167</h3><div class="meta">453 m · 6 min · à pied</div><ul><li>🚶 Marche 6 min · 453 m</li></ul></div>
+<div class="leg walk"><h3>61. LDN_167 → Ibis Shoreditch</h3><div class="meta">298 m · 4 min · à pied</div><ul><li>🚶 Marche 4 min · 299 m</li></ul></div>
+<h2>Hors parcours</h2><p class="note">Encore à flasher à Londres, mais trop excentrés pour cette boucle :</p><ul>
+<li><a href="https://www.google.com/maps/search/?api=1&amp;query=51.524382,-0.214138" target="_blank" rel="noopener">LDN_01</a> — 30 pts</li>
+<li><a href="https://www.google.com/maps/search/?api=1&amp;query=51.530493,-0.220211" target="_blank" rel="noopener">LDN_28</a> — 10 pts</li>
+<li><a href="https://www.google.com/maps/search/?api=1&amp;query=51.514319,-0.199232" target="_blank" rel="noopener">LDN_52</a> — 30 pts</li>
+<li><a href="https://www.google.com/maps/search/?api=1&amp;query=51.509133,-0.196767" target="_blank" rel="noopener">LDN_95</a> — 20 pts</li>
+<li><a href="https://www.google.com/maps/search/?api=1&amp;query=51.5705413,-0.0245583" target="_blank" rel="noopener">LDN_148</a> — 30 pts</li>
+<li><a href="https://www.google.com/maps/search/?api=1&amp;query=51.4887753,-0.1655983" target="_blank" rel="noopener">LDN_154</a> — 20 pts</li>
+<li><a href="https://www.google.com/maps/search/?api=1&amp;query=51.4832018,-0.1772533" target="_blank" rel="noopener">LDN_155</a> — 50 pts</li>
+</ul><p class="note">États des invaders : <a href="https://www.invader-spotter.art/">Invader Spotter</a>, novembre 2026.</p>
+<script>
+const route = [[51.5155931, -0.0729418], [51.5212535, -0.071744], [51.5225212, -0.0716766], [51.521623, -0.0718179], [51.5215422, -0.0755008], [51.5262941, -0.0789677], [51.5262157, -0.0803647], [51.5268595, -0.0805417], [51.527837, -0.0765804], [51.527317, -0.081757], [51.5222087, -0.087204], [51.522122, -0.106786], [51.5193824, -0.1170291], [51.5175272, -0.1160163], [51.5229664, -0.1247428], [51.522345, -0.132336], [51.5209184, -0.1348491], [51.5193260416, -0.1330843321], [51.5192705, -0.1360037], [51.517015, -0.151388], [51.5219432, -0.1572482], [51.5238924, -0.1584974], [51.514851, -0.151226], [51.51546, -0.139255], [51.515813, -0.1362096], [51.5149615, -0.1364717], [51.5143377, -0.1367863], [51.5129826, -0.1362178], [51.5126008, -0.1369547], [51.5125358, -0.1372414], [51.509992, -0.140039], [51.506414, -0.1462273], [51.50969, -0.136017], [51.5119560272, -0.1350373469], [51.5120201, -0.1351777], [51.5113429, -0.1343472], [51.5119574, -0.131382], [51.514566, -0.131128], [51.513368, -0.132773], [51.5129690281, -0.1337609785], [51.5134601, -0.134891], [51.5143224, -0.1342068], [51.5158112, -0.1361955], [51.5166993, -0.1324863], [51.5170755, -0.1271632], [51.514164, -0.124388], [51.5128805, -0.127115], [51.5105366, -0.1236921], [51.5102983, -0.1257336], [51.5071271, -0.1282639], [51.4933875046, -0.116923429], [51.493646, -0.116993], [51.493632, -0.117003], [51.5005078, -0.1150141], [51.5021986, -0.1162278], [51.5061131, -0.1144831], [51.507246, -0.096041], [51.505253, -0.092062], [51.5180373, -0.0796388], [51.518145, -0.079539], [51.5163549, -0.0749594], [51.5155931, -0.0729418]];
+const markers = [{"n": "1", "lab": "Ibis Shoreditch", "lat": 51.5155931, "lng": -0.0729418, "pts": ""}, {"n": "2", "lab": "LDN_25", "lat": 51.5212535, "lng": -0.071744, "pts": 20}, {"n": "3", "lab": "LDN_57", "lat": 51.5225212, "lng": -0.0716766, "pts": 10}, {"n": "4", "lab": "LDN_24", "lat": 51.521623, "lng": -0.0718179, "pts": 10}, {"n": "5", "lab": "LDN_171", "lat": 51.5215422, "lng": -0.0755008, "pts": 40}, {"n": "6", "lab": "LDN_97", "lat": 51.5262941, "lng": -0.0789677, "pts": 30}, {"n": "7", "lab": "LDN_102", "lat": 51.5262157, "lng": -0.0803647, "pts": 10}, {"n": "8", "lab": "LDN_170", "lat": 51.5268595, "lng": -0.0805417, "pts": 30}, {"n": "9", "lab": "LDN_172", "lat": 51.527837, "lng": -0.0765804, "pts": 40}, {"n": "10", "lab": "LDN_121", "lat": 51.527317, "lng": -0.081757, "pts": 30}, {"n": "11", "lab": "LDN_169", "lat": 51.5222087, "lng": -0.087204, "pts": 20}, {"n": "12", "lab": "LDN_79", "lat": 51.522122, "lng": -0.106786, "pts": 10}, {"n": "13", "lab": "LDN_175", "lat": 51.5193824, "lng": -0.1170291, "pts": 50}, {"n": "14", "lab": "LDN_160", "lat": 51.5175272, "lng": -0.1160163, "pts": 30}, {"n": "15", "lab": "LDN_176", "lat": 51.5229664, "lng": -0.1247428, "pts": 20}, {"n": "16", "lab": "LDN_54", "lat": 51.522345, "lng": -0.132336, "pts": 30}, {"n": "17", "lab": "LDN_178", "lat": 51.5209184, "lng": -0.1348491, "pts": 50}, {"n": "18", "lab": "LDN_165", "lat": 51.5193260416, "lng": -0.1330843321, "pts": 20}, {"n": "19", "lab": "LDN_153", "lat": 51.5192705, "lng": -0.1360037, "pts": 30}, {"n": "20", "lab": "LDN_20", "lat": 51.517015, "lng": -0.151388, "pts": 10}, {"n": "21", "lab": "LDN_174", "lat": 51.5219432, "lng": -0.1572482, "pts": 20}, {"n": "22", "lab": "LDN_173", "lat": 51.5238924, "lng": -0.1584974, "pts": 30}, {"n": "23", "lab": "LDN_19", "lat": 51.514851, "lng": -0.151226, "pts": 10}, {"n": "24", "lab": "LDN_29", "lat": 51.51546, "lng": -0.139255, "pts": 10}, {"n": "25", "lab": "LDN_193", "lat": 51.515813, "lng": -0.1362096, "pts": 20}, {"n": "26", "lab": "LDN_92", "lat": 51.5149615, "lng": -0.1364717, "pts": 30}, {"n": "27", "lab": "LDN_191", "lat": 51.5143377, "lng": -0.1367863, "pts": 20}, {"n": "28", "lab": "LDN_159", "lat": 51.5129826, "lng": -0.1362178, "pts": 50}, {"n": "29", "lab": "LDN_151", "lat": 51.5126008, "lng": -0.1369547, "pts": 30}, {"n": "30", "lab": "LDN_152", "lat": 51.5125358, "lng": -0.1372414, "pts": 30}, {"n": "31", "lab": "LDN_13", "lat": 51.509992, "lng": -0.140039, "pts": 20}, {"n": "32", "lab": "LDN_184", "lat": 51.506414, "lng": -0.1462273, "pts": 20}, {"n": "33", "lab": "LDN_15", "lat": 51.50969, "lng": -0.136017, "pts": 20}, {"n": "34", "lab": "LDN_163", "lat": 51.5119560272, "lng": -0.1350373469, "pts": 50}, {"n": "35", "lab": "LDN_162", "lat": 51.5120201, "lng": -0.1351777, "pts": 30}, {"n": "36", "lab": "LDN_180", "lat": 51.5113429, "lng": -0.1343472, "pts": 20}, {"n": "37", "lab": "LDN_190", "lat": 51.5119574, "lng": -0.131382, "pts": 20}, {"n": "38", "lab": "LDN_64", "lat": 51.514566, "lng": -0.131128, "pts": 10}, {"n": "39", "lab": "LDN_06", "lat": 51.513368, "lng": -0.132773, "pts": 10}, {"n": "40", "lab": "LDN_166", "lat": 51.5129690281, "lng": -0.1337609785, "pts": 20}, {"n": "41", "lab": "LDN_189", "lat": 51.5134601, "lng": -0.134891, "pts": 40}, {"n": "42", "lab": "LDN_55", "lat": 51.5143224, "lng": -0.1342068, "pts": 30}, {"n": "43", "lab": "LDN_192", "lat": 51.5158112, "lng": -0.1361955, "pts": 20}, {"n": "44", "lab": "LDN_73", "lat": 51.5166993, "lng": -0.1324863, "pts": 30}, {"n": "45", "lab": "LDN_179", "lat": 51.5170755, "lng": -0.1271632, "pts": 40}, {"n": "46", "lab": "LDN_38", "lat": 51.514164, "lng": -0.124388, "pts": 10}, {"n": "47", "lab": "LDN_161", "lat": 51.5128805, "lng": -0.127115, "pts": 20}, {"n": "48", "lab": "LDN_187", "lat": 51.5105366, "lng": -0.1236921, "pts": 30}, {"n": "49", "lab": "LDN_186", "lat": 51.5102983, "lng": -0.1257336, "pts": 30}, {"n": "50", "lab": "LDN_185", "lat": 51.5071271, "lng": -0.1282639, "pts": 30}, {"n": "51", "lab": "LDN_164", "lat": 51.4933875046, "lng": -0.116923429, "pts": 30}, {"n": "52", "lab": "LDN_158", "lat": 51.493646, "lng": -0.116993, "pts": 20}, {"n": "53", "lab": "LDN_157", "lat": 51.493632, "lng": -0.117003, "pts": 20}, {"n": "54", "lab": "LDN_182", "lat": 51.5005078, "lng": -0.1150141, "pts": 30}, {"n": "55", "lab": "LDN_183", "lat": 51.5021986, "lng": -0.1162278, "pts": 50}, {"n": "56", "lab": "LDN_188", "lat": 51.5061131, "lng": -0.1144831, "pts": 100}, {"n": "57", "lab": "LDN_82", "lat": 51.507246, "lng": -0.096041, "pts": 20}, {"n": "58", "lab": "LDN_83", "lat": 51.505253, "lng": -0.092062, "pts": 30}, {"n": "59", "lab": "LDN_168", "lat": 51.5180373, "lng": -0.0796388, "pts": 30}, {"n": "60", "lab": "LDN_99", "lat": 51.518145, "lng": -0.079539, "pts": 30}, {"n": "61", "lab": "LDN_167", "lat": 51.5163549, "lng": -0.0749594, "pts": 40}];
+
+const map = L.map('map', { scrollWheelZoom: false });
+L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png', { maxZoom: 19, attribution: '&copy; OpenStreetMap' }).addTo(map);
+L.polyline(route, { color: '#4f46e5', weight: 3, opacity: 0.8 }).addTo(map);
+for (const m of markers) {
+  const hotel = !m.lab.startsWith('LDN_');
+  const icon = L.divIcon({ className: '', html: '<div class="num-icon' + (hotel ? ' hotel' : '') + '">' + (hotel ? 'H' : m.n) + '</div>', iconSize: [24, 24], iconAnchor: [12, 12] });
+  L.marker([m.lat, m.lng], { icon }).addTo(map).bindPopup('<b>' + m.n + '. ' + m.lab + '</b>' + (m.pts ? ' — ' + m.pts + ' pts' : '')
+    + '<br><a target="_blank" href="https://www.google.com/maps/search/?api=1&query=' + m.lat + ',' + m.lng + '">Google Maps</a>');
+}
+map.fitBounds(L.latLngBounds(route), { padding: [20, 20] });
+</script>
+</body>
+</html>
